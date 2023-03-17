@@ -1,6 +1,6 @@
 # fit-rs
 
-Parse most Garmin FIT files. Supports custom developer data, but not compressed timestamp headers.
+Rust crate for parsing most Garmin FIT files. Supports custom developer data, but not compressed timestamp headers.
 
 Example:
 ```rust
