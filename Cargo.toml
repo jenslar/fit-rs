@@ -13,4 +13,4 @@ time = "0.3"
 walkdir = "2.3.2"
 geojson = {version = "0.24", features = ["geo-types"]}
 kml = "0.7.1"
-mp4iter = {path = "../mp4iter"}
+mp4iter = {git = "https://github.com/jenslar/mp4iter.git"}
