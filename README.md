@@ -2,7 +2,16 @@
 
 Rust crate for parsing most Garmin FIT files. Supports custom developer data, but not compressed timestamp headers.
 
-Example:
+
+Usage (not yet on crates.io):
+
+`Cargo.toml`:
+```toml
+[dependencies]
+fit-rs = {git = "https://github.com/jenslar/fit-rs.git"}
+```
+
+`src/main.rs`:
 ```rust
 use fit_rs::Fit;
 fn main() -> std::io::Result<()> {
