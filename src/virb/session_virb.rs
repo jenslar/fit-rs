@@ -20,9 +20,9 @@ pub struct VirbSession{
     /// Note that this does not represent
     /// start of session.
     pub t0: Option<PrimitiveDateTime>,
-    /// Date time for start of session.
+    /// Time for start of session, relative to `.t0`.
     pub start: Option<Duration>,
-    /// Date time for end of session.
+    /// Time for end of session, relative to `.t0`.
     pub end: Option<Duration>,
     processed: bool // defaults to false
 }
@@ -43,9 +43,6 @@ impl VirbSession {
                 Ok(f) => f.path().to_owned(),
                 Err(_) => continue
             };
-
-            // let ext = path.extension()
-            //     .and_then(|s| s.to_str());
 
             // Ignoring errors for now
             if has_extension(&path, "mp4") {
@@ -181,6 +178,21 @@ impl VirbSession {
         Err(FitError::NoSuchSession)
     }
 
+    // Get basename for naming e.g. output dir,
+    // derived from filestem from first clip in session
+    // prioritizing high-res filename.
+    pub fn basename(&self) -> Option<String> {
+        let path = self.virb.first()
+            .and_then(|vf| vf.mp4().or_else(|| vf.glv()));
+
+        if let Some(p) = path {
+            p.file_stem()
+                .map(|s| s.to_string_lossy().to_string())
+        } else {
+            None
+        }
+    }
+
     /// Extracts MP4 `udta` atom.
     /// The `udta` data fields are
     /// returned as raw bytes.
@@ -203,6 +215,11 @@ impl VirbSession {
     pub fn contains(&self, uuid: &str) -> bool {
         self.virb.iter()
             .any(|virbfile| virbfile.uuid == uuid)
+    }
+
+    /// Returns path to FIT-file.
+    pub fn fit_path(&self) -> PathBuf {
+        self.fit.path.to_owned()
     }
 
     /// Returns FIT-data if set.

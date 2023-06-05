@@ -1,11 +1,14 @@
+//! FIT session. Corresponds to data logged within
+//! the timespan of a VIRB recording session.
+
 use std::{ops::Range, path::{PathBuf, Path}};
 
 use time::{Duration, PrimitiveDateTime};
 
 use crate::{Fit, FitError, CameraEvent};
 
-/// VIRB recording session UUIDs and index range
-/// in `Fit.records`.
+/// FIT data corresponding to VIRB recording session
+/// via MP4 clip UUIDs translated to index range in `Fit.records`.
 #[derive(Debug, Default, Clone)]
 pub struct FitSession {
     /// Path to FIT-file.
@@ -80,8 +83,8 @@ impl FitSession {
     /// Returns start, end timestamps for session as tuple `(start, end)`,
     /// where `start`, `end` represent time offsets from FIT-file start.
     /// 
-    /// Note that deriving duration via `end - start` may differ slightly
-    /// from the duration for the corresponding MP4-file/s.
+    /// Note that FIT duration may differ slightly
+    /// from the media duration of corresponding VIRB MP4-file/s.
     pub fn duration(&self) -> Option<(Duration, Duration)> {
         if let Some(fit) = &self.fit {
 

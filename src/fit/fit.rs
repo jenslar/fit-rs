@@ -429,7 +429,7 @@ impl Fit {
     /// at GPS satellite sync. Watches seem to log the full value directly and not need
     /// the correlation value.
     pub fn t0(&self, offset_hours: i64, default_on_error: bool) -> Result<PrimitiveDateTime, FitError> {
-        let fit_datetime = Self::fit_basetime()?;
+        let fit_datetime = Self::basetime()?;
         let tc = match TimestampCorrelation::from_fit(self) {
             Ok(t) => t,
             Err(err) => match default_on_error {
@@ -449,7 +449,7 @@ impl Fit {
     /// Returns `PrimitiveDateTime` object for FIT
     /// start datetime `1989-12-31 00:00:00.000`.
     // pub fn fit_datetime(&self, offset_hours: Option<i8>) -> Result<PrimitiveDateTime, FitError> {
-    fn fit_basetime() -> Result<PrimitiveDateTime, FitError> {
+    fn basetime() -> Result<PrimitiveDateTime, FitError> {
         let basetime = Date::from_calendar_date(1989, Month::December, 31)?
             .with_hms_milli(0, 0, 0, 0)?;
         

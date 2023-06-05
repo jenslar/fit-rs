@@ -42,26 +42,31 @@ pub struct SensorData {
     pub timestamp: u32,               
     /// timestamp_ms value, id:0, milliseconds
     pub timestamp_ms: u16,            
-    /// sample_time_offset value, id:1
+    /// sample_time_offset value counted from record timestamp, id:1, milliseconds
     pub sample_time_offset: Vec<u16>, 
-    /// x value, id:2 gyro_x, acc_x, mag_x
+    /// Raw x-axis values
+    /// (FIT field id:2, depending on sensor `gyro_x`, `acc_x`, `mag_x`)
     /// Note: stored as u16 in FIT-file,
     /// but cast to u32 for compatibility
     /// with one_d_sensor_data, e.g. barometer/209
     pub x: Vec<u32>,                  
-    /// y value, id:3 gyro_y, acc_y, mag_y
+    /// Raw y-axis values
+    /// (FIT field id:3, depending on sensor `gyro_y`, `acc_y`, `mag_y`)
     /// Note: stored as u16 in FIT-file,
     /// but cast to u32 for compatibility
     /// with one_d_sensor_data, e.g. barometer/209
     pub y: Vec<u32>,                  
-    /// z value, id:4 gyro_z, acc_z, mag_z
+    /// Raw z-axis values
+    /// (FIT field id:4, depending on sensor `gyro_z`, `acc_z`, `mag_z`)
     /// Note: stored as u16 in FIT-file,
     /// but cast to u32 for compatibility
     /// with one_d_sensor_data, e.g. barometer/209
     pub z: Vec<u32>,                  
-    // values below calculated post-extraction via corresponding three_d_sensor_calibration messages
+    /// Calibrated x-axis values, calculated post-extraction
     pub calibrated_x: Vec<f64>, // id:5 calibrated_gyro_x, calibrated_acc_x, calibrated_mag_x
+    /// Calibrated y-axis values, calculated post-extraction
     pub calibrated_y: Vec<f64>, // id:6 calibrated_gyro_y, calibrated_acc_y, calibrated_mag_y
+    /// Calibrated z-axis values, calculated post-extraction
     pub calibrated_z: Vec<f64>, // id:7 calibrated_gyro_z, calibrated_acc_z, calibrated_mag_z
     pub(crate) index: usize
 }

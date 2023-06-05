@@ -63,6 +63,34 @@ impl SensorType {
         }
     }
 
+    pub fn from_str(value: &str) -> Option<Self> {
+        match value.to_lowercase().as_str() {
+            "acc" | "acce" | "accl" | "accelerometer" => Some(Self::Accelerometer),
+            "gyr" | "gyro" | "gyroscope" => Some(Self::Gyroscope),
+            "mag" | "magnetometer" => Some(Self::Magnetometer),
+            "bar" | "baro" | "barometer" => Some(Self::Barometer),
+            _ => None
+        }
+    }
+
+    pub fn to_string(&self) -> String {
+        match self {
+            SensorType::Accelerometer => "Accelerometer".to_owned(),
+            SensorType::Gyroscope => "Gyroscope".to_owned(),
+            SensorType::Magnetometer => "Magnetometer".to_owned(),
+            SensorType::Barometer => "Barometer".to_owned(),
+        }
+    }
+
+    pub fn units(&self) -> String {
+        match self {
+            SensorType::Accelerometer => "m/s²".to_owned(),
+            SensorType::Gyroscope => "rad/s²".to_owned(),
+            SensorType::Magnetometer => "μT".to_owned(),
+            SensorType::Barometer => "Pa".to_owned(),
+        }
+    }
+
     /// Returns FIT global ID for the sensor.
     pub fn global(&self) -> u16 {
         match self {

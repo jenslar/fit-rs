@@ -126,6 +126,13 @@ impl VirbFile {
         None
     }
 
+    /// Returns `true` if the specified MP4-file
+    /// matches `VirbFile.uuid`.
+    pub fn is_match(&self, mp4_path: &Path) -> Result<bool, FitError> {
+        let uuid = Self::uuid_mp4(mp4_path)?;
+        Ok(self.uuid == uuid)
+    }
+
     /// Returns `true` if a FIT-file and
     /// at least one corresponding video file
     /// is set (`.GLV` or `.MP4`).
