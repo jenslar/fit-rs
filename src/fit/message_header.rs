@@ -31,27 +31,34 @@
 //!                       changes the rest of the header layout if set.
 //! ```
 
-use binread::BinRead;
+use binrw::BinRead;
 
 use crate::Fit;
 
-#[derive(Debug, Clone, Copy)]
-pub enum MessageType {
+#[derive(Debug, Clone, PartialEq)]
+pub enum Kind {
     Definition,
     Data
 }
 
+// #[derive(Debug, Clone)]
+// pub enum Message {
+//     Definition(DefinitionMessage),
+//     Data(DataMessage)
+// }
+
 /// FIT message header.
-#[derive(Debug, Copy, Clone, BinRead)]
+#[derive(Debug, Default, Copy, Clone, BinRead)]
 pub struct MessageHeader(u8);
 
 impl MessageHeader {
     /// Checks whether message is a definition
     /// or a data message.
-    pub fn kind(&self) -> MessageType {
+    // pub fn kind(&self) -> MessageType {
+    pub fn kind(&self) -> Kind {
         match Fit::bit_set(self.0, 6) {
-            true => MessageType::Definition,
-            false => MessageType::Data,
+            true => Kind::Definition,
+            false => Kind::Data,
         }
     }
 
@@ -84,11 +91,12 @@ impl MessageHeader {
 
     /// Returns `true` if definition contains developer fields.
     /// Only relvant for definition messages and always returns `false`
-    /// for data messages.
-    pub fn dev_fields(&self) -> bool {
+    /// for data messages, since there is no flag for developer data in data
+    /// messages, this has to be looked up via the corresponding definition.
+    pub fn dev(&self) -> bool {
         match self.kind() {
-            MessageType::Definition => Fit::bit_set(self.0, 5),
-            MessageType::Data => false
+            Kind::Definition => Fit::bit_set(self.0, 5),
+            Kind::Data => false
         }
     }
 }

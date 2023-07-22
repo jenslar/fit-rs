@@ -1,8 +1,8 @@
 //! Representation of a Garmin VIRB video clip with a matched FIT file.
 
-use std::path::{Path, PathBuf};
+use std::{path::{Path, PathBuf}, io::Read};
 
-use mp4iter::{Mp4, Udta};
+use mp4iter::{Mp4, Udta, FourCC};
 
 use crate::{FitError, files::has_extension};
 
@@ -45,7 +45,7 @@ impl VirbFile {
     pub fn meta(&self) -> Result<Udta, FitError> {
         if let Some(path) = &self.path() {
             let mut mp4 = Mp4::new(&path)?;
-            mp4.udta().map_err(|e| e.into())
+            mp4.udta(false).map_err(|e| e.into())
         } else {
             Err(FitError::PathNotSet)
         }
@@ -102,10 +102,14 @@ impl VirbFile {
     pub fn uuid_mp4(mp4_path: &Path) -> Result<String, FitError> {
         let mut mp4 = Mp4::new(&mp4_path)?;
 
-        // Find and seek to "uuid" atom position (only one per VIRB MP4-file)
-        if let Some(hdr) = mp4.find("uuid")? {
-            let mut atom = mp4.atom(&hdr)?;
-            return atom.read_to_string().map_err(|err| FitError::IOError(err))
+        let mut udta = mp4.udta(false)?;
+        let fcc = FourCC::from_str("uuid");
+        for field in udta.fields.iter_mut() {
+            if field.name == fcc {
+                let mut uuid = String::new();
+                field.data.read_to_string(&mut uuid)?;
+                return Ok(uuid)
+            }
         }
 
         Err(FitError::InvalidVirbMp4)
@@ -120,7 +124,7 @@ impl VirbFile {
         };
 
         if let Some(vid) = video {
-            return Mp4::new(vid).ok()?.duration().ok()
+            return Mp4::new(vid).ok()?.duration(false).ok()
         }
 
         None

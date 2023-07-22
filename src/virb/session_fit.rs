@@ -80,12 +80,15 @@ impl FitSession {
         Ok(())
     }
 
-    /// Returns start, end timestamps for session as tuple `(start, end)`,
-    /// where `start`, `end` represent time offsets from FIT-file start.
+    /// Derives start, end timestamps for session
+    /// as tuple `(start, end)`. These represent
+    /// time offsets relative to FIT-file start.
+    /// Use `FitSession.timespan_abs()` to derive absolute
+    /// timestamps.
     /// 
-    /// Note that FIT duration may differ slightly
+    /// Note that duration derived via FIT data may differ slightly
     /// from the media duration of corresponding VIRB MP4-file/s.
-    pub fn duration(&self) -> Option<(Duration, Duration)> {
+    pub fn timespan_rel(&self) -> Option<(Duration, Duration)> {
         if let Some(fit) = &self.fit {
 
             // Find first camera_event/161 in session index range
@@ -109,15 +112,17 @@ impl FitSession {
     }
 
     /// Derives start, end date time for recording as tuple `(start, end)`.
+    /// Use `FitSession.timespan_rel()` to derive relative
+    /// timestamps.
     /// 
     /// `default_on_error` sets start time for FIT-file to FIT base start time
     /// 1989-12-31T00:00:00.000 if no timestamp correlation value (FIT global 162)
     /// can be found.
-    pub fn datetime(&self, offset_hrs: Option<i64>, default_on_error: bool) -> Result<(PrimitiveDateTime, PrimitiveDateTime), FitError> {
+    pub fn timespan_abs(&self, offset_hrs: Option<i64>, default_on_error: bool) -> Result<(PrimitiveDateTime, PrimitiveDateTime), FitError> {
         if let Some(fit) = &self.fit {
             let t0 = fit.t0(offset_hrs.unwrap_or(0), default_on_error)?;
 
-            let (start_dur, end_dur) = self.duration().ok_or_else(|| FitError::NoSuchSession)?;
+            let (start_dur, end_dur) = self.timespan_rel().ok_or_else(|| FitError::NoSuchSession)?;
             return Ok((t0 + start_dur, t0 + end_dur))
         }
 
@@ -158,14 +163,15 @@ impl FitSessions {
         self.sessions.iter().find(|s| s.uuid.contains(&uuid.to_owned()))
     }
 
-    /// Parse of linked FIT-file.
+    /// Parses linked FIT-file.
+    /// 
     /// Optionally limit to specific message type via FIT global ID,
     /// see Profile.xlsx in FIT SDK.
     pub fn parse(&mut self, global: Option<u16>) -> Result<(), FitError> {
         self.fit = match global {
             Some(_) => {
                 self.filtered = global;
-                Some(Fit::parse(&self.path, global)?)
+                Some(Fit::parse(&self.path, global, false)?)
             },
             None => {
                 self.filtered = None;
@@ -176,6 +182,7 @@ impl FitSessions {
     }
 
     /// VIRB only.
+    /// 
     /// Derive start/end indeces in `FIT.records`
     /// for all recording sessions. Use `FitSession::range()`
     /// to get range for specific recording session
@@ -217,8 +224,8 @@ impl FitSessions {
                         sessions.push(session);
                         session = FitSession::default();
                     },
-                    // Ignore alternative camera events for session start/end
-                    // event type 3 is 'still photo taken' and has no relevance at all
+                    // Ignore alternative camera events for session start/end.
+                    // Event type 3 is 'still photo taken' and has no relevance at all.
                     3 | 4 | 6 => (),
                     // Push UUID in between event types 0 and 2
                     // Duplicate UUIDs will always sit next to each other.
@@ -232,23 +239,28 @@ impl FitSessions {
         Ok(())
     }
 
+    /// Return data indeces for given UUID.
     pub fn range(&self, uuid: &str) -> Option<Range<usize>> {
         self.find(&uuid.to_owned())
             .map(|session| session.range())
     }
 
+    /// Returns reference to `Fit` data if parsed and set.
     pub fn fit(&self) -> Option<&Fit> {
         self.fit.as_ref()
     }
 
+    /// Returns reference to sessions.
     pub fn sessions(&self) -> &[FitSession] {
         &self.sessions
     }
 
+    /// Returns number of sessions.
     pub fn len(&self) -> usize {
         self.sessions.len()
     }
 
+    /// Returns `true` is no sessions are logged.
     pub fn is_empty(&self) -> bool {
         self.sessions.is_empty()
     }

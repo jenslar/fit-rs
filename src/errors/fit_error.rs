@@ -6,7 +6,7 @@ use std::{fmt, string::FromUtf8Error};
 #[derive(Debug)]
 pub enum FitError {
     /// Converted `BinResult` error.
-    BinReadError(binread::Error),
+    BinReadError(binrw::Error),
     /// Converted `time::Error` error.
     TimeError(time::Error),
     /// Converted `Utf8Error`.
@@ -125,8 +125,8 @@ impl From<std::string::FromUtf8Error> for FitError {
 }
 
 /// Converts `binread::Error` to `FitError`
-impl From<binread::Error> for FitError {
-    fn from(err: binread::Error) -> FitError {
+impl From<binrw::Error> for FitError {
+    fn from(err: binrw::Error) -> FitError {
         FitError::BinReadError(err)
     }
 }

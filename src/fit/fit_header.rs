@@ -2,7 +2,7 @@
 
 use std::io::Cursor;
 
-use binread::{BinRead, BinReaderExt};
+use binrw::{BinRead, BinReaderExt};
 
 use crate::errors::FitError;
 
@@ -18,7 +18,7 @@ pub struct FitHeader {
     /// Bytes 4-7: Size of FIT data succeeding header, Little Endian
     pub datasize: u32,
     /// Bytes 8-11: Ascii for .FIT
-    pub dotfit: [char; 4],
+    pub dotfit: [u8; 4],
     /// Bytes 12, 13: CRC, optional. CRC check not implemented.
     #[br(default)]
     pub crc: Option<u16>,
@@ -51,5 +51,11 @@ impl FitHeader {
         } else {
             self.datasize as usize
         }
+    }
+
+    pub fn dotfit(&self) -> String{
+        self.dotfit.iter()
+            .map(|n| *n as char)
+            .collect()
     }
 }

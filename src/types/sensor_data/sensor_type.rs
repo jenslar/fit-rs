@@ -91,6 +91,15 @@ impl SensorType {
         }
     }
 
+    pub fn quantifier(&self) -> String {
+        match self {
+            SensorType::Accelerometer => "Acceleration".to_owned(),
+            SensorType::Gyroscope => "Rotation".to_owned(),
+            SensorType::Magnetometer => "Magnetic field".to_owned(),
+            SensorType::Barometer => "Pressure".to_owned(),
+        }
+    }
+
     /// Returns FIT global ID for the sensor.
     pub fn global(&self) -> u16 {
         match self {

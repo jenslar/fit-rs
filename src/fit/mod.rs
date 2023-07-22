@@ -1,6 +1,7 @@
 pub mod fit;
 pub mod fit_header;
 pub mod message_header;
+pub mod message;
 pub mod definition_message;
 pub mod definition_field;
 pub mod data_attributes;
@@ -10,7 +11,8 @@ pub mod value;
 
 pub use fit::Fit;
 pub use fit_header::FitHeader;
-pub use message_header::{MessageHeader, MessageType};
+pub use message::Message;
+pub use message_header::{MessageHeader, Kind};
 pub use definition_field::{BaseTypeDefinition, DefinitionField};
 pub use definition_message::DefinitionMessage;
 pub use data_attributes::DataFieldAttributes;

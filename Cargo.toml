@@ -1,15 +1,18 @@
 [package]
 name = "fit-rs"
-version = "1.0.5"
+version = "1.1.0"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+authors = ["Jens Larsson <jens.dev@fastmail.com>"]
+repository = "https://github.com/jenslar/fit-rs"
+license = "MIT"
+description = "Parse Garmin FIT-files."
+keywords = ["gopro", "gpmf", "action camera", "gps", "sensor"]
 
 [dependencies]
-binread = "2.2"
-rayon = "1.5.3"
-nalgebra = "0.31.1"
-time = "0.3"
-walkdir = "2.3.2"
-geojson = {version = "0.24", features = ["geo-types"]}
+binrw = "0.11.2"
+rayon = "1.7.0"
+nalgebra = "0.32.3"
+time = "0.3.23"
+walkdir = "2.3.3"
+geojson = {version = "0.24.1", features = ["geo-types"]}
 mp4iter = {git = "https://github.com/jenslar/mp4iter.git"}

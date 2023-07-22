@@ -24,7 +24,6 @@
 
 use std::{path::{PathBuf, Path}, io::Cursor, collections::HashMap, ops::Range};
 
-use binread::{BinReaderExt, BinRead};
 use rayon::{iter::{IntoParallelRefIterator, ParallelIterator}, prelude::IntoParallelRefMutIterator};
 use time::{PrimitiveDateTime, Date, Month};
 
@@ -41,13 +40,12 @@ use crate::{
     TimestampCorrelation,
     Record,
     FitSession,
-    profile::message_type::FitMessageType
+    profile::message_type::FitMessageType, fit::{message::MessageType, Message}
 };
 use super::{
     fit_header::FitHeader,
-    data_message::DataMessage,
-    definition_message::DefinitionMessage,
-    message_header::{MessageHeader, MessageType}
+    DataMessage,
+    DefinitionMessage,
 };
 
 /// Fit core data struct, containing parsed FIT data, header etc.
@@ -65,21 +63,29 @@ pub struct Fit {
 impl Fit {
     /// Parse FIT-data in full.
     pub fn new(path: &Path) -> Result<Self, FitError> {
-        Self::parse(path, None)
+        Self::parse(path, None, false)
     }
 
-    /// Parse FIT-data. Optionally filter on specified `global` ID 
-    /// while parsing, which speeds up reads considerably if only
-    /// a single data type is of interest. Developer data
-    /// is not supported when filtering.
-    pub fn parse(path: &Path, global: Option<u16>) -> Result<Self, FitError> {
+    pub fn debug(path: &Path) -> Result<Fit, FitError> {
+        Self::parse(path, None, true)
+    }
 
-        // TODO 220812 REGRESSION CHECK on 20mb virb fit old code 60ms faster on work laptop
-        
+    /// Parse FIT-data.
+    /// 
+    /// Most data types will need further processing. E.g.
+    /// FIT stores coordinates as semicircles, not decimal degrees.
+    /// 
+    /// Optionally filter on specified `global` ID 
+    /// while parsing. Developer data is not supported
+    /// when filtering at parse time.
+    pub fn parse(path: &Path, global: Option<u16>, debug: bool) -> Result<Self, FitError> {
+
         let mut cursor = Self::cursor(path)?;
         let len = cursor.get_ref().len();
 
         let fitheader = FitHeader::new(&mut cursor)?;
+
+        if debug {println!("{fitheader:#?}")}
 
         let data_size = fitheader.data_size(len) as u64;
 
@@ -94,51 +100,50 @@ impl Fit {
 
         while cursor.position() < data_size {
 
-            let header: MessageHeader = cursor.read_ne()?;
-            let id = header.id();
+            if debug {print!("OFFSET {} | ", cursor.position())}
 
-            match header.kind() {
+            // Parses message in full.
+            // Due to parsing data messages, this is slightly slower than,
+            // e.g. reading only header and only if data message flag is set parse data.
+            // It is cleaner however.
+            let message = Message::parse(&mut cursor, &definitions)?;
+            let id = message.id();
 
-                MessageType::Definition => {
+            match message.message_type() {
 
-                    let definition = DefinitionMessage::new(
-                        &mut cursor,
-                        &header,
-                        &field_descriptions
-                    )?;
+                // Definition message
+                MessageType::Definition(mut definition) => {
+
+                    // Add field descriptions for developer data
+                    definition.with_field_descriptions(&field_descriptions);
+
+                    if debug {println!("{definition:#?}")}
                     
                     definitions.insert(
                         id,
-                        definition 
+                        definition
                     );
                 },
 
-                MessageType::Data => {
+                // Data message
+                MessageType::Data(mut data) => {
 
-                    let definition = definitions.get(&id).ok_or_else(||
-                        FitError::UnknownDefinition {local: id, offset: cursor.position()}
-                    )?;
-
+                    // Ignore storing message if FIT global ID
+                    // does not correspond to the one optionally specified.
                     if let Some(g) = global {
-                        if definition.global != g {
-                            // If message does not have correct global ID
-                            // derive message length and set position
-                            // to next message
-                            let pos = cursor.position();
-                            cursor.set_position(pos + definition.data_size() as u64);
+                        if data.global != g {
                             continue;
                         }
                     }
+    
+                    // Set index to preserve chronological order if filtering etc
+                    data.index = data_index;
 
-                    let data_message = DataMessage::new(
-                        &mut cursor,
-                        &definition,
-                        data_index
-                    )?;
-
+                    if debug {println!("{data:#?}")}
+    
                     // Parse and store custom developer definitions
-                    if data_message.global == 206 {
-                        let field_descr = FieldDescriptionMessage::new(&data_message)?;
+                    if data.global == 206 {
+                        let field_descr = FieldDescriptionMessage::new(&data)?;
                         // Require both field_definition_number and developer_data_index
                         // to create a unique key since third parties are not
                         // always using this correctly, sometimes causing ID collisions
@@ -147,11 +152,13 @@ impl Fit {
                             field_descr,
                         );
                     }
-
-                    data_messages.push(data_message);
+    
+                    data_messages.push(data);
 
                     data_index += 1; // data message index
                 }
+
+                _ => ()
             }
         }
 
@@ -163,154 +170,62 @@ impl Fit {
         })
     }
 
-    /// Debug FIT-data. Optionally filter on specified `global` ID 
-    /// while parsing, which speeds up reads considerably if only
-    /// a single data type is of interest. Developer data
-    /// is not supported when filtering.
-    pub fn debug(path: &Path, global: Option<u16>) -> Result<Self, FitError> {
-
-        // TODO 220812 REGRESSION CHECK on 20mb virb fit old code 60ms faster on work laptop
-        
-        let mut cursor = Self::cursor(path)?;
-        let len = cursor.get_ref().len();
-
-        let fitheader = FitHeader::new(&mut cursor)?;
-
-        println!("{fitheader:#?}");
-
-        let data_size = fitheader.data_size(len) as u64;
-
-        // Simple incremental index for data messages,
-        // that can be used to sort in e.g. chronological order,
-        // even after filtering on type
-        let mut data_index = 0;
-        
-        let mut definitions: HashMap<u8, DefinitionMessage> = HashMap::new();
-        let mut data_messages: Vec<DataMessage> = Vec::new();
-        let mut field_descriptions: HashMap<(u8, u8), FieldDescriptionMessage> = HashMap::new();
-
-        while cursor.position() < data_size {
-
-            // println!("FIELD DESCRIPTIONS:\n{field_descriptions:#?}");
-
-            print!("OFFSET {} | ", cursor.position());
-
-            let header: MessageHeader = cursor.read_ne()?;
-            let id = header.id();
-
-            match header.kind() {
-
-                MessageType::Definition => {
-
-                    let definition = DefinitionMessage::new(
-                        &mut cursor,
-                        &header,
-                        &field_descriptions
-                    )?;
-
-                    println!("{definition:#?}");
-                    
-                    definitions.insert(
-                        id,
-                        definition 
-                    );
-                },
-
-                MessageType::Data => {
-
-                    let definition = definitions.get(&id).ok_or_else(||
-                        FitError::UnknownDefinition {local: id, offset: cursor.position()}
-                    )?;
-
-                    if let Some(g) = global {
-                        if definition.global != g {
-                            // If message does not have correct global ID
-                            // derive message length and set position
-                            // to next message
-                            let pos = cursor.position();
-                            cursor.set_position(pos + definition.data_size() as u64);
-                            continue;
-                        }
-                    }
-
-                    let data_message = DataMessage::new(
-                        &mut cursor,
-                        &definition,
-                        data_index
-                    )?;
-
-                    println!("{data_message:#?}");
-
-                    // Parse and store custom developer definitions
-                    if data_message.global == 206 {
-                        let field_descr = FieldDescriptionMessage::new(&data_message)?;
-                        // Require both field_definition_number and developer_data_index
-                        // to create a unique key since third parties are not
-                        // always using this correctly, sometimes causing ID collisions
-                        field_descriptions.insert(
-                            (field_descr.field_definition_number, field_descr.developer_data_index),
-                            field_descr,
-                        );
-                    }
-
-                    data_messages.push(data_message);
-
-                    data_index += 1; // data message index
-                }
-            }
-        }
-
-        Ok(Fit{
-            path: path.to_owned(),
-            header: fitheader,
-            records: data_messages,
-            index: HashMap::new()
-        })
-    }
-
+    /// Read FIT-file into a `std::io::Cursor<Vec<u8>>`.
     fn cursor(path: &Path) -> std::io::Result<Cursor<Vec<u8>>> {
         let bytes = std::fs::read(&path)?;
         Ok(Cursor::new(bytes))
     }
 
-    /// Read single FIT value from cursor with correct endianess
-    /// determined via FIT data field `architecture` value.
-    /// 
-    /// Currently only used to read a `u16` for `DefinitionMessage`.
-    pub(crate) fn read<T: Sized + BinRead>(cursor: &mut Cursor<Vec<u8>>, arch: u8) -> Result<T, FitError> {
-        match arch {
-            // Little Endian
-            0 => cursor.read_le::<T>().map_err(|err| FitError::BinReadError(err)),
-            // Big Endian
-            1 => cursor.read_be::<T>().map_err(|err| FitError::BinReadError(err)),
-            // Invalid architecture value
-            _ => Err(FitError::InvalidArchitecture{arch, pos: cursor.position()})
-        }
-    }
+    // /// Read single FIT value from cursor with correct endianess
+    // /// determined via FIT data field `architecture` value.
+    // /// 
+    // /// Currently only used to read a `u16` for `DefinitionMessage`.
+    // pub(crate) fn read<T, R: Read + BufRead + Seek>(
+    //     // cursor: &mut Cursor<Vec<u8>>,
+    //     reader: &mut R,
+    //     arch: u8
+    // ) -> Result<T, FitError>
+    //     where
+    //         T: BinRead,
+    //         <T as BinRead>::Args<'static>: Sized + Clone + Default
+    // {
+    //     match arch {
+    //         // Little Endian
+    //         0 => reader.read_le::<T>().map_err(|err| FitError::BinReadError(err)),
+    //         // Big Endian
+    //         1 => reader.read_be::<T>().map_err(|err| FitError::BinReadError(err)),
+    //         // Invalid architecture value
+    //         _ => Err(FitError::InvalidArchitecture{arch, pos: reader.seek(SeekFrom::Current(0))?})
+    //     }
+    // }
 
     /// Returns `true` if bit at `position` is set. For checking FIT message headers.
-    /// Panics if `position` is not a value between 0 and 7 (inclusive).
+    /// Panics if `position` is not a value between, and including, 0 and 7.
     pub(crate) fn bit_set(byte: u8, position: u8) -> bool {
         // ensure u8 8-bit range.
-        assert!((0..=7).contains(&position), "Invalid bit position '{position}' for 8-bit integer, must be 0-7");
+        assert!((0..=7).contains(&position),
+            "Invalid bit position '{position}' for 8-bit integer, must be 0-7");
         byte & (1 << position) != 0
     }
 
-    /// Returns total number of records.
+    /// Returns total number of data messages.
     pub fn len(&self) -> usize {
         self.records.len()
     }
 
+    /// Returns `true` if there are no data messages.
     pub fn is_empty(&self) -> bool {
         self.records.is_empty()
     }
 
+    /// Iterate over data messages.
     pub fn iter(&self) -> impl Iterator<Item = &DataMessage> {
         self.records.iter()
     }
 
     /// VIRB only.
-    /// Indexes FIT-file by generating a hashmap to `Fit.index`
+    /// 
+    /// Indexes FIT-file by generating a hashmap in `Fit.index`
     /// with first UUID in session as key and corresponding
     /// indeces (`Fit.records[start_idx .. end_idx]`) as `std::ops::Range<usize>`.
     pub fn index(&mut self) -> Result<(), FitError> {
@@ -343,7 +258,7 @@ impl Fit {
     /// Filter FIT data on FIT global ID (e.g. `record` global ID = 20),
     /// and/or within range indeces.
     /// 
-    /// `range` is mostly there to filter FIT data on a specific recording session
+    /// `range` is there to filter FIT data on a specific recording session
     /// for Garmin VIRB cameras.
     pub fn filter(&self, global_id: Option<u16>, range: Option<&Range<usize>>) -> Vec<DataMessage> {
         let range = range.cloned().unwrap_or(0 .. self.len());
@@ -359,6 +274,20 @@ impl Fit {
     }
 
     /// VIRB only.
+    /// 
+    /// Filter on VIRB recording session timespan.
+    /// Note that this means some data, such as
+    /// `timestamp_correlation`/`162` may be logged outside of
+    /// this range.
+    pub fn session(&self, uuid: &str) -> Result<FitSession, FitError> {
+        self.sessions()?.iter()
+            .find(|s| s.uuid.contains(&uuid.to_owned()))
+            .cloned()
+            .ok_or_else(|| FitError::NoSuchSession)
+    }
+
+    /// VIRB only.
+    /// 
     /// Derive start/end indeces in `FIT.records`
     /// for all recording sessions. Use `FitSession::range()`
     /// to get range for specific recording session
@@ -426,7 +355,7 @@ impl Fit {
     /// Garmin's FIT base start time is used: 1989-12-31T00:00:00.000.
     /// VIRB and watches log timestamps differently. VIRB logs a relative timestamp
     /// from start of FIT-file that has to be augmented by a correlation value logged
-    /// at GPS satellite sync. Watches seem to log the full value directly and not need
+    /// at GPS satellite lock. Watches seem to log the full value directly and not need
     /// the correlation value.
     pub fn t0(&self, offset_hours: i64, default_on_error: bool) -> Result<PrimitiveDateTime, FitError> {
         let fit_datetime = Self::basetime()?;
@@ -446,17 +375,13 @@ impl Fit {
         )
     }
 
-    /// Returns `PrimitiveDateTime` object for FIT
+    /// Returns date time as `PrimitiveDateTime` for FIT
     /// start datetime `1989-12-31 00:00:00.000`.
-    // pub fn fit_datetime(&self, offset_hours: Option<i8>) -> Result<PrimitiveDateTime, FitError> {
     fn basetime() -> Result<PrimitiveDateTime, FitError> {
+        // ??? Could probably just unwrap here instead of returning result
         let basetime = Date::from_calendar_date(1989, Month::December, 31)?
             .with_hms_milli(0, 0, 0, 0)?;
         
-        // if let Some(offset) = offset_hours {
-        //     let datetime_off = datetime.assume_offset(UtcOffset::from_whole_seconds(offset_hours as i32 * 3600)?);
-        // }
-
         Ok(basetime)
     }
 
@@ -507,25 +432,36 @@ impl Fit {
         SensorData::from_fit(&self, range, sensor_type)
     }
 
-    /// Presumably VIRB only.
-    /// Returns `TimestampCorrelation`.
+    /// VIRB only.
+    /// 
+    /// VIRB logs a relative timestamp counting from
+    /// when the camera was turned on. All timestamps
+    /// require augmentation by an offset value,
+    /// `timestamp_correlation` (FIT global ID `162`),
+    /// to become absolute date time stamps.
+    /// This is logged at GPS satellite lock.
+    /// 
+    /// Other devices, such as watches, seem to directly
+    /// log a UTC timestamp in seconds for all records.
     pub fn time(&self) -> Result<TimestampCorrelation, FitError> {
         TimestampCorrelation::from_fit(&self)
     }
 
-    /// Returns a sub-set of `Record/20` relating to location only.
+    /// Returns a sub-set of `Record/20`. Which fields are
+    /// present in `Record` is highly dependent on device.
+    /// 
     /// Currently supported fields are present for VIRB cameras,
     /// but may not be for other devices:
-    /// - timestamp, field definition number 253
-    /// - latitude, field definition number 0
-    /// - longitude, field definition number 1
-    /// - distance, field definition number 5
-    /// - speed, field definition number 73
-    /// - altitude, field definition number 78
-    /// - gps_accuracy, field definition number 31
+    /// - `timestamp`, field definition number `253`
+    /// - `latitude`, field definition number `0`
+    /// - `longitude`, field definition number `1`
+    /// - `distance`, field definition number `5`
+    /// - `speed`, field definition number `73`
+    /// - `altitude`, field definition number `78`
+    /// - `gps_accuracy`, field definition number `31`
     /// 
     /// If `no_fail` is set to `true`, records with errors
-    /// relating to missing fields will be discarded.
+    /// relating to missing fields will be silently discarded.
     pub fn record(
         &self,
         range: Option<&Range<usize>>,

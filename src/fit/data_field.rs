@@ -3,6 +3,8 @@
 use std::fmt;
 use std::io::Cursor;
 
+use binrw::BinRead;
+
 use crate::errors::FitError;
 
 use super::DataFieldAttributes;
@@ -11,18 +13,20 @@ use super::DefinitionField;
 use super::value::Value;
 
 /// FIT data message field.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, BinRead)]
 pub struct DataField {
     /// Field definition.
     pub definition: DefinitionField,
     /// Optional attributes listing
     /// field name, scale, offset, unit.
     /// Required for developer data.
+    #[br(default)]
     pub attributes: Option<DataFieldAttributes>,
     /// Data values.
     /// `Value` is a container enum for `Vec<T>`,
     /// where `T` is a type defined in the
     /// [FIT SDK](https://developer.garmin.com/fit/)
+    #[br(default)]
     pub data: Value,
 }
 
@@ -58,19 +62,19 @@ impl DataField {
     /// Returns field name if set.
     pub fn name(&self) -> Option<&str> {
         self.attributes.as_ref()
-        .map(|attr| attr.name.as_str())
+            .map(|attr| attr.name.as_str())
     }
     
     /// Returns field scale if set.
     pub fn scale(&self) -> Option<u32> {
         self.attributes.as_ref()
-        .and_then(|attr| attr.scale)
+            .and_then(|attr| attr.scale)
     }
     
     /// Returns field offset if set.
     pub fn offset(&self) -> Option<i32> {
         self.attributes.as_ref()
-        .and_then(|attr| attr.offset)
+            .and_then(|attr| attr.offset)
     }
     
     /// Returns field units if set.
@@ -83,21 +87,21 @@ impl DataField {
     pub fn set_name(&mut self, name: &str) {
         self.init_attr();
         self.attributes.as_mut()
-        .map(|attr| attr.name = name.to_owned());
+            .map(|attr| attr.name = name.to_owned());
     }
     
     /// Set field scale.
     pub fn set_scale(&mut self, scale: Option<u32>) {
         self.init_attr();
         self.attributes.as_mut()
-        .map(|attr| attr.scale = scale);
+            .map(|attr| attr.scale = scale);
     }
     
     /// Set field offset.
     pub fn set_offset(&mut self, offset: Option<i32>) {
         self.init_attr();
         self.attributes.as_mut()
-        .map(|attr| attr.offset = offset);
+            .map(|attr| attr.offset = offset);
     }
     
     /// Set field units.

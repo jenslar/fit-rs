@@ -1,6 +1,6 @@
 //! FIT definition message field.
 
-use binread::BinRead;
+use binrw::BinRead;
 
 use super::DataFieldAttributes;
 use crate::Fit;

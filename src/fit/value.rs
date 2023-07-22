@@ -1,8 +1,8 @@
 //! FIT core data types, such as string and numerical values.
 
-use std::io::Cursor;
+use std::io::{Read, BufRead, Seek};
 
-use binread::{BinRead, BinReaderExt};
+use binrw::{BinRead, BinReaderExt};
 
 use crate::errors::FitError;
 
@@ -60,6 +60,12 @@ pub enum Value {
     Uint64(Vec<u64>),
     /// Base type: 16
     Uint64z(Vec<u64>),
+}
+
+impl Default for Value {
+    fn default() -> Self {
+        Self::Byte(Vec::default())
+    }
 }
 
 impl AsRef<Value> for Value {
@@ -184,24 +190,30 @@ impl Value {
     /// (`0` = Little Endian, `1` = Big Endian)
     /// into `Vec<T>`.
     #[inline]
-    fn read<T: Sized + BinRead>(
-        cursor: &mut Cursor<Vec<u8>>,
+    fn read<T, R: Read + BufRead + Seek>(
+        // cursor: &mut Cursor<Vec<u8>>,
+        reader: &mut R,
         arch: u8,
         repeats: u8
-    ) -> Result<Vec<T>, FitError> {
+    ) -> Result<Vec<T>, FitError>
+        where
+            T: BinRead,
+            <T as BinRead>::Args<'static>: Sized + Clone + Default
+    {
         match arch {
             // Little Endian
             0 => (0..repeats).into_iter()
-                    .map(|_| cursor.read_le::<T>()
+                    .map(|_| reader.read_le::<T>()
                         .map_err(|err| FitError::BinReadError(err)))
                     .collect(),
             // Big Endian
             1 => (0..repeats).into_iter()
-                    .map(|_| cursor.read_be::<T>()
+                    .map(|_| reader.read_be::<T>()
                         .map_err(|err| FitError::BinReadError(err)))
                     .collect(),
             // Invalid architecture value
-            _ => Err(FitError::InvalidArchitecture{arch, pos: cursor.position()})
+            // _ => Err(FitError::InvalidArchitecture{arch, pos: reader.position()})
+            _ => Err(FitError::InvalidArchitecture{arch, pos: reader.seek(std::io::SeekFrom::Current(0))?})
         }
     }
 
@@ -209,13 +221,14 @@ impl Value {
     /// While `lossy` is optional, it's still `true` by default
     /// due to some FIT-files containing corrupt strings.
     #[inline]
-    fn from_utf8(
-        cursor: &mut Cursor<Vec<u8>>,
+    fn from_utf8<R: Read + BufRead + Seek>(
+        // cursor: &mut Cursor<Vec<u8>>,
+        reader: &mut R,
         arch: u8,
         repeats: u8,
         lossy: bool
     ) -> Result<String, FitError> {
-        let bytes = Self::read::<u8>(cursor, arch, repeats)?;
+        let bytes = Self::read::<u8, R>(reader, arch, repeats)?;
         if lossy {
             Ok(String::from_utf8_lossy(&bytes).replace(char::from(0), "").to_string())
         } else {
@@ -227,8 +240,9 @@ impl Value {
     /// representing one or more
     /// values.
     #[inline]
-    pub fn new(
-        cursor: &mut Cursor<Vec<u8>>,
+    pub fn new<R: Read + BufRead + Seek>(
+        // cursor: &mut Cursor<Vec<u8>>,
+        reader: &mut R,
         field_def: &DefinitionField,
         architecture: u8
     ) -> Result<Self, FitError> {
@@ -241,25 +255,25 @@ impl Value {
             // Changed Value::Enum from reading into single u8,
             // to reading into Vec<u8>, since some devices
             // OCCASIONALLY define Enum with total length > 1...?
-            0 => Ok(Self::Enum(Self::read::<u8>(cursor, architecture, repeats)?)),
-            1 => Ok(Self::Sint8(Self::read::<i8>(cursor, architecture, repeats)?)),
-            2 => Ok(Self::Uint8(Self::read::<u8>(cursor, architecture, repeats)?)),
-            3 => Ok(Self::Sint16(Self::read::<i16>(cursor, architecture, repeats)?)),
-            4 => Ok(Self::Uint16(Self::read::<u16>(cursor, architecture, repeats)?)),
-            5 => Ok(Self::Sint32(Self::read::<i32>(cursor, architecture, repeats)?)),
-            6 => Ok(Self::Uint32(Self::read::<u32>(cursor, architecture, repeats)?)),
+            0 => Ok(Self::Enum(Self::read::<u8, R>(reader, architecture, repeats)?)),
+            1 => Ok(Self::Sint8(Self::read::<i8, R>(reader, architecture, repeats)?)),
+            2 => Ok(Self::Uint8(Self::read::<u8, R>(reader, architecture, repeats)?)),
+            3 => Ok(Self::Sint16(Self::read::<i16, R>(reader, architecture, repeats)?)),
+            4 => Ok(Self::Uint16(Self::read::<u16, R>(reader, architecture, repeats)?)),
+            5 => Ok(Self::Sint32(Self::read::<i32, R>(reader, architecture, repeats)?)),
+            6 => Ok(Self::Uint32(Self::read::<u32, R>(reader, architecture, repeats)?)),
             // Parsing bytes as lossy utf8 due to corrupt (?) strings in some fit files.
             // May be a user option in a later version.
-            7 => Ok(Self::String(Self::from_utf8(cursor, architecture, repeats, true)?)),
-            8 => Ok(Self::Float32(Self::read::<f32>(cursor, architecture, repeats)?)),
-            9 => Ok(Self::Float64(Self::read::<f64>(cursor, architecture, repeats)?)),
-            10 => Ok(Self::Uint8z(Self::read::<u8>(cursor, architecture, repeats)?)),
-            11 => Ok(Self::Uint16z(Self::read::<u16>(cursor, architecture, repeats)?)),
-            12 => Ok(Self::Uint32z(Self::read::<u32>(cursor, architecture, repeats)?)),
-            13 => Ok(Self::Byte(Self::read::<u8>(cursor, architecture, repeats)?)),
-            14 => Ok(Self::Sint64(Self::read::<i64>(cursor, architecture, repeats)?)),
-            15 => Ok(Self::Uint64(Self::read::<u64>(cursor, architecture, repeats)?)),
-            16 => Ok(Self::Uint64z(Self::read::<u64>(cursor, architecture, repeats)?)),
+            7 => Ok(Self::String(Self::from_utf8(reader, architecture, repeats, true)?)),
+            8 => Ok(Self::Float32(Self::read::<f32, R>(reader, architecture, repeats)?)),
+            9 => Ok(Self::Float64(Self::read::<f64, R>(reader, architecture, repeats)?)),
+            10 => Ok(Self::Uint8z(Self::read::<u8, R>(reader, architecture, repeats)?)),
+            11 => Ok(Self::Uint16z(Self::read::<u16, R>(reader, architecture, repeats)?)),
+            12 => Ok(Self::Uint32z(Self::read::<u32, R>(reader, architecture, repeats)?)),
+            13 => Ok(Self::Byte(Self::read::<u8, R>(reader, architecture, repeats)?)),
+            14 => Ok(Self::Sint64(Self::read::<i64, R>(reader, architecture, repeats)?)),
+            15 => Ok(Self::Uint64(Self::read::<u64, R>(reader, architecture, repeats)?)),
+            16 => Ok(Self::Uint64z(Self::read::<u64, R>(reader, architecture, repeats)?)),
             b => Err(FitError::UnknownBaseType(b))
         }
     }
