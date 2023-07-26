@@ -28,7 +28,7 @@ impl BaseTypeDefinition {
 
     /// Returns FIT Base Type Number.
     pub fn number(&self) -> u8 {
-        0b0000_1111 & self.0
+        0b0001_1111 & self.0
     }
 
     /// Returns byte length for FIT base types.
