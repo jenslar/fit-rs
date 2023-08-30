@@ -85,7 +85,7 @@ impl SensorType {
     pub fn units(&self) -> String {
         match self {
             SensorType::Accelerometer => "m/s²".to_owned(),
-            SensorType::Gyroscope => "rad/s²".to_owned(),
+            SensorType::Gyroscope => "deg/s".to_owned(),
             SensorType::Magnetometer => "μT".to_owned(),
             SensorType::Barometer => "Pa".to_owned(),
         }

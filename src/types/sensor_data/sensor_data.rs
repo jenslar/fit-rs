@@ -62,11 +62,11 @@ pub struct SensorData {
     /// but cast to u32 for compatibility
     /// with one_d_sensor_data, e.g. barometer/209
     pub z: Vec<u32>,                  
-    /// Calibrated x-axis values, calculated post-extraction
+    /// Calibrated x-axis values (deg/s), calculated post-extraction
     pub calibrated_x: Vec<f64>, // id:5 calibrated_gyro_x, calibrated_acc_x, calibrated_mag_x
-    /// Calibrated y-axis values, calculated post-extraction
+    /// Calibrated y-axis values (deg/s), calculated post-extraction
     pub calibrated_y: Vec<f64>, // id:6 calibrated_gyro_y, calibrated_acc_y, calibrated_mag_y
-    /// Calibrated z-axis values, calculated post-extraction
+    /// Calibrated z-axis values (deg/s), calculated post-extraction
     pub calibrated_z: Vec<f64>, // id:7 calibrated_gyro_z, calibrated_acc_z, calibrated_mag_z
     pub(crate) index: usize
 }
