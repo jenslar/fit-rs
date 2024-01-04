@@ -112,7 +112,7 @@ impl SensorData {
         }
 
         Ok(Self {
-            sensor_type: sensor_type.to_owned() ,
+            sensor_type: sensor_type.to_owned(),
             timestamp: timestamp
                 .ok_or_else(|| FitError::ErrorAssigningField{global: global_id, field_def_no: 253})?,
             timestamp_ms: timestamp_ms
