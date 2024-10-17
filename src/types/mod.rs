@@ -2,15 +2,16 @@
 //! Please note that automatic conversion is only covered for the message types covered here.
 
 pub mod field_description;
+pub mod file_id;
 pub mod gps_metadata;
 pub mod record_virb;
-pub mod record_full;
 pub mod timestamp_correlation;
 pub mod camera_event;
 pub mod sensor_data;
 
 pub use camera_event::CameraEvent;
 pub use field_description::FieldDescriptionMessage;
+pub use file_id::FileId;
 pub use gps_metadata::{GpsMetadata, FitPoint};
 pub use record_virb::Record;
 pub use sensor_data::{

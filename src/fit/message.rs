@@ -1,4 +1,4 @@
-use std::{io::Cursor, ops::Deref, collections::HashMap};
+use std::{io::Cursor, collections::HashMap};
 
 use binrw::{BinReaderExt, BinRead};
 
@@ -7,19 +7,17 @@ use crate::{FitError, FieldDescriptionMessage};
 use super::{MessageHeader, DefinitionMessage, DataMessage, Kind};
 
 #[derive(Debug, Clone, BinRead)]
-// #[br(import(contains_developer_fields: bool, kind: Kind))]
+// #[br(import(header: MessageHeader))]
 #[br(import(header: MessageHeader))]
 pub enum MessageType {
     Definition(
-        // #[br(assert(kind == Kind::Definition))]
         #[br(assert(header.kind() == Kind::Definition))]
-        // #[br(args(contains_developer_fields))]
-        #[br(args(header.dev() == true))]
+        // #[br(args(header.dev() == true))]
+        #[br(args(header.dev()))]
         DefinitionMessage
     ),
     Data(
-        // currently does not use binrw for parse since this requires a definition message
-        // #[br(assert(kind == Kind::Data), default)]
+        // data message currently does not parse via binrw since this requires a definition message
         #[br(assert(header.kind() == Kind::Data), default)]
         DataMessage
     ),
@@ -34,9 +32,9 @@ impl Default for MessageType {
 
 #[derive(Debug, Default, BinRead)]
 pub struct Message {
-    header: MessageHeader,
+    pub(crate) header: MessageHeader,
     #[br(args(header))]
-    message: MessageType,
+    pub(crate) message: MessageType,
     // #[br(default)]
     // index: usize
 }
@@ -53,17 +51,14 @@ impl Message {
         let id = header.id();
         let pos = cursor.position();
 
-        // let msgtype = match MessageType::read_args(cursor, (&header,))? {
         let message = match header.kind() {
-            Kind::Definition => MessageType::read_ne_args(cursor, (header,))?, // native endian
+            Kind::Definition => MessageType::read_ne_args(cursor, (header,))?,
             Kind::Data => {
                 let definition = definitions.get(&id)
-                        .ok_or_else(|| FitError::UnknownDefinition {local: id, offset: pos})?;
+                    .ok_or_else(|| FitError::UnknownDefinition {local: id, offset: pos})?;
                 let data_message = DataMessage::parse(
-                    // data,
                     cursor,
                     definition,
-                    // data_index
                 )?;
                 MessageType::Data(data_message)
             },

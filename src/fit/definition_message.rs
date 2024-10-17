@@ -14,22 +14,22 @@ use super::DefinitionField;
 #[br(import(contains_developer_fields: bool))]
 pub struct DefinitionMessage {
     /// Reserved. Byte 0.
-    reserved: u8,
+    _reserved: u8,
     /// Architecture/Endianess. Byte 1.
     /// Possible values: 0=LE, 1=BE
     pub(crate) architecture: u8,
     /// FIT global message ID. Bytes 2-3.
     #[br(is_little = (architecture == 0))]
     pub global: u16,
-    number_of_fields: u8,
+    _number_of_fields: u8,
     /// Definition fields. Bytes 3.. (varying length)
-    #[br(count = number_of_fields)]
+    #[br(count = _number_of_fields)]
     pub fields: Vec<DefinitionField>,
     /// Number of developer fields. Optional.
     #[br(if(contains_developer_fields, 0))]
-    number_of_devfields: u8,
+    _number_of_devfields: u8,
     /// Developer definition fields (3 bytes/each). Optional.
-    #[br(count = number_of_devfields)]
+    #[br(count = _number_of_devfields)]
     pub dev_fields: Vec<DefinitionField>,
 }
 

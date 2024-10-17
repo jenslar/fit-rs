@@ -191,7 +191,6 @@ impl Value {
     /// into `Vec<T>`.
     #[inline]
     fn read<T, R: Read + BufRead + Seek>(
-        // cursor: &mut Cursor<Vec<u8>>,
         reader: &mut R,
         arch: u8,
         repeats: u8
@@ -222,7 +221,6 @@ impl Value {
     /// due to some FIT-files containing corrupt strings.
     #[inline]
     fn from_utf8<R: Read + BufRead + Seek>(
-        // cursor: &mut Cursor<Vec<u8>>,
         reader: &mut R,
         arch: u8,
         repeats: u8,
@@ -241,7 +239,6 @@ impl Value {
     /// values.
     #[inline]
     pub fn new<R: Read + BufRead + Seek>(
-        // cursor: &mut Cursor<Vec<u8>>,
         reader: &mut R,
         field_def: &DefinitionField,
         architecture: u8

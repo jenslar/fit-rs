@@ -1,5 +1,5 @@
 //! FIT 1 byte message header.
-//! 
+//!
 //! Layout, normal header:
 //! ```
 //! Bit idx    7 6 5 4 3 2 1 0
@@ -15,7 +15,7 @@
 //!            | ╰--- 0 = Data, 1 = Definition
 //!            ╰----- 0 = Normal header, 1 = Compressed time stamp header
 //! ```
-//! 
+//!
 //! Layout, compressed timestamp header:
 //! ```
 //! Bit idx    7 6 5 4 3 2 1 0
@@ -41,6 +41,7 @@ pub enum Kind {
     Data
 }
 
+// CURRENTLY NOT USED, EVALUATING
 // #[derive(Debug, Clone)]
 // pub enum Message {
 //     Definition(DefinitionMessage),
@@ -65,7 +66,7 @@ impl MessageHeader {
     /// FIT local ID (0-15) for matching
     /// definition messages with data message
     /// during parse.
-    /// 
+    ///
     /// Note that while `id()` supports compressed
     /// timestamp headers the rest of `fit-rs` does not.
     pub fn id(&self) -> u8 {
@@ -79,7 +80,7 @@ impl MessageHeader {
     /// Checks if header is a compressed
     /// time stamp header and returns the
     /// value if so.
-    /// 
+    ///
     /// Note that while `comp_time()` supports compressed
     /// timestamp headers the rest of `fit-rs` does not.
     pub fn comp_time(&self) -> Option<u8> {

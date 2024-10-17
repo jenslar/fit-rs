@@ -1,5 +1,6 @@
 //! FIT data message.
 
+use std::collections::HashMap;
 use std::fmt;
 use std::io::Cursor;
 

@@ -1,7 +1,6 @@
 //! Garmin VIRB related functionality.
 
 pub mod session_fit;
-pub mod session_fit_new;
 pub mod session_virb;
 pub mod file;
 

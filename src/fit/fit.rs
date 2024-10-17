@@ -3,44 +3,51 @@
 //! ```rs
 //! use crate::fit_rs::Fit;
 //! use std::path::Path;
-//! 
+//!
 //! fn main -> std::io::Result<()> {
 //!     // Parse a FIT-file.
 //!     let fit_path = Path::new("FITFILE.fit");
 //!     let fit = Fit::new(&fit_path)?;
-//! 
+//!
 //!     for record in fit.records.iter() {
 //!         println!("{record:?}");
 //!     }
-//! 
+//!
 //!     // Extract UUID from Garmin VIRB action camera.
 //!     let mp4_path = PathBuf::from("VIRB_MP4FILE.MP4");
 //!     let uuid = Fit::uuid_mp4(&mp4_path)?;
 //!     println!("{uuid}");
-//! 
+//!
 //!     Ok(())
 //! }
 //! ```
 
-use std::{path::{PathBuf, Path}, io::Cursor, collections::HashMap, ops::Range};
+use std::{
+    path::{PathBuf, Path},
+    io::Cursor,
+    collections::HashMap,
+    ops::Range
+};
 
-use rayon::{iter::{IntoParallelRefIterator, ParallelIterator}, prelude::IntoParallelRefMutIterator};
-use time::{PrimitiveDateTime, Date, Month};
+use rayon::{
+    iter::{IntoParallelRefIterator, ParallelIterator},
+    prelude::IntoParallelRefMutIterator
+};
+use time::PrimitiveDateTime;
 
 use crate::{
+    constants::FIT_DEFAULT_DATETIME,
     errors::FitError,
-    types::{
-        FieldDescriptionMessage,
-        FitPoint,
-        SensorType,
+    fit::{message::MessageType, Message},
+    profile::message_type::FitMessageType, types::{
+        FieldDescriptionMessage, FileId, FitPoint, SensorType
     },
     CameraEvent,
-    GpsMetadata,
-    SensorData,
-    TimestampCorrelation,
-    Record,
     FitSession,
-    profile::message_type::FitMessageType, fit::{message::MessageType, Message}
+    GpsMetadata,
+    Record,
+    SensorData,
+    TimestampCorrelation
 };
 use super::{
     fit_header::FitHeader,
@@ -71,11 +78,11 @@ impl Fit {
     }
 
     /// Parse FIT-data.
-    /// 
+    ///
     /// Most data types will need further processing. E.g.
     /// FIT stores coordinates as semicircles, not decimal degrees.
-    /// 
-    /// Optionally filter on specified `global` ID 
+    ///
+    /// Optionally filter on specified `global` ID
     /// while parsing. Developer data is not supported
     /// when filtering at parse time.
     pub fn parse(path: &Path, global: Option<u16>, debug: bool) -> Result<Self, FitError> {
@@ -93,7 +100,7 @@ impl Fit {
         // that can be used to sort in e.g. chronological order,
         // even after filtering on type
         let mut data_index = 0;
-        
+
         let mut definitions: HashMap<u8, DefinitionMessage> = HashMap::new();
         let mut data_messages: Vec<DataMessage> = Vec::new();
         let mut field_descriptions: HashMap<(u8, u8), FieldDescriptionMessage> = HashMap::new();
@@ -118,7 +125,7 @@ impl Fit {
                     definition.with_field_descriptions(&field_descriptions);
 
                     if debug {println!("{definition:#?}")}
-                    
+
                     definitions.insert(
                         id,
                         definition
@@ -135,12 +142,12 @@ impl Fit {
                             continue;
                         }
                     }
-    
+
                     // Set index to preserve chronological order if filtering etc
                     data.index = data_index;
 
                     if debug {println!("{data:#?}")}
-    
+
                     // Parse and store custom developer definitions
                     if data.global == 206 {
                         let field_descr = FieldDescriptionMessage::new(&data)?;
@@ -152,7 +159,7 @@ impl Fit {
                             field_descr,
                         );
                     }
-    
+
                     data_messages.push(data);
 
                     data_index += 1; // data message index
@@ -175,29 +182,6 @@ impl Fit {
         let bytes = std::fs::read(&path)?;
         Ok(Cursor::new(bytes))
     }
-
-    // /// Read single FIT value from cursor with correct endianess
-    // /// determined via FIT data field `architecture` value.
-    // /// 
-    // /// Currently only used to read a `u16` for `DefinitionMessage`.
-    // pub(crate) fn read<T, R: Read + BufRead + Seek>(
-    //     // cursor: &mut Cursor<Vec<u8>>,
-    //     reader: &mut R,
-    //     arch: u8
-    // ) -> Result<T, FitError>
-    //     where
-    //         T: BinRead,
-    //         <T as BinRead>::Args<'static>: Sized + Clone + Default
-    // {
-    //     match arch {
-    //         // Little Endian
-    //         0 => reader.read_le::<T>().map_err(|err| FitError::BinReadError(err)),
-    //         // Big Endian
-    //         1 => reader.read_be::<T>().map_err(|err| FitError::BinReadError(err)),
-    //         // Invalid architecture value
-    //         _ => Err(FitError::InvalidArchitecture{arch, pos: reader.seek(SeekFrom::Current(0))?})
-    //     }
-    // }
 
     /// Returns `true` if bit at `position` is set. For checking FIT message headers.
     /// Panics if `position` is not a value between, and including, 0 and 7.
@@ -224,7 +208,7 @@ impl Fit {
     }
 
     /// VIRB only.
-    /// 
+    ///
     /// Indexes FIT-file by generating a hashmap in `Fit.index`
     /// with first UUID in session as key and corresponding
     /// indeces (`Fit.records[start_idx .. end_idx]`) as `std::ops::Range<usize>`.
@@ -232,7 +216,7 @@ impl Fit {
         let camera_events = self.camera(None)?;
 
         let mut index: HashMap<String, Range<usize>> = HashMap::new();
-        
+
         let mut uuid = None;
         let mut start = None;
         camera_events.iter() // can not use par_iter, since assigning outer variable
@@ -257,7 +241,7 @@ impl Fit {
 
     /// Filter FIT data on FIT global ID (e.g. `record` global ID = 20),
     /// and/or within range indeces.
-    /// 
+    ///
     /// `range` is there to filter FIT data on a specific recording session
     /// for Garmin VIRB cameras.
     pub fn filter(&self, global_id: Option<u16>, range: Option<&Range<usize>>) -> Vec<DataMessage> {
@@ -274,9 +258,10 @@ impl Fit {
     }
 
     /// VIRB only.
-    /// 
-    /// Filter on VIRB recording session timespan.
-    /// Note that this means some data, such as
+    ///
+    /// Filter data on VIRB recording session timespan.
+    ///
+    /// Note that some data, such as
     /// `timestamp_correlation`/`162` may be logged outside of
     /// this range.
     pub fn session(&self, uuid: &str) -> Result<FitSession, FitError> {
@@ -287,7 +272,7 @@ impl Fit {
     }
 
     /// VIRB only.
-    /// 
+    ///
     /// Derive start/end indeces in `FIT.records`
     /// for all recording sessions. Use `FitSession::range()`
     /// to get range for specific recording session
@@ -298,7 +283,7 @@ impl Fit {
 
         // Get all camera events.
         let cam = self.camera(None)?;
-        
+
         for evt in cam.iter() {
             // Match event types.
             // Logged chronologically so
@@ -342,14 +327,14 @@ impl Fit {
     }
 
     /// VIRB only.
-    /// 
+    ///
     /// Derives start time of FIT-file via `timestamp_correlation/162`
     /// with option time offset in hours (e.g. time zone).
     /// If no `timestamp_correlation/162` exists in input
     /// `ParseError::NoDataForMessageType(162)` will be returned.
     /// If a required field cannot be assigned, its field definition number
     /// will be returned in `ParseError::ErrorAssigningFieldValue(FIELD_NO)`.
-    /// 
+    ///
     /// `default_on_error` ensures a time for first logged message can be returned.
     /// If `default_on_error = true` and no `timestamp_correlation`/`162` can be found,
     /// Garmin's FIT base start time is used: 1989-12-31T00:00:00.000.
@@ -358,31 +343,22 @@ impl Fit {
     /// at GPS satellite lock. Watches seem to log the full value directly and not need
     /// the correlation value.
     pub fn t0(&self, offset_hours: i64, default_on_error: bool) -> Result<PrimitiveDateTime, FitError> {
-        let fit_datetime = Self::basetime()?;
+        // let fit_datetime = Self::basetime();
+        // let fit_datetime = FIT_DEFAULT_DATETIME;
         let tc = match TimestampCorrelation::from_fit(self) {
             Ok(t) => t,
             Err(err) => match default_on_error {
-                true => return Ok(fit_datetime), // FIT start time
+                true => return Ok(FIT_DEFAULT_DATETIME),
                 false => return Err(err.into())
             }
         };
 
         Ok(
-            fit_datetime // FIT start time
+            FIT_DEFAULT_DATETIME
             + time::Duration::hours(offset_hours) // TODO 220808 change offset to proper timezone?
             + time::Duration::seconds(tc.timestamp as i64 - tc.system_timestamp as i64)
             + time::Duration::milliseconds(tc.timestamp_ms as i64 - tc.system_timestamp_ms as i64),
         )
-    }
-
-    /// Returns date time as `PrimitiveDateTime` for FIT
-    /// start datetime `1989-12-31 00:00:00.000`.
-    fn basetime() -> Result<PrimitiveDateTime, FitError> {
-        // ??? Could probably just unwrap here instead of returning result
-        let basetime = Date::from_calendar_date(1989, Month::December, 31)?
-            .with_hms_milli(0, 0, 0, 0)?;
-        
-        Ok(basetime)
     }
 
     /// Looks up name, units, scale and offset for most
@@ -407,7 +383,7 @@ impl Fit {
     }
 
     /// Garmin VIRB only.
-    /// 
+    ///
     /// Returns all `camera_event` messages in FIT-file.
     pub fn camera(&self, range: Option<&Range<usize>>) -> Result<Vec<CameraEvent>, FitError> {
         CameraEvent::from_fit(self, range)
@@ -422,7 +398,7 @@ impl Fit {
     /// - Gyroscope (3D)
     /// - Accelerometer (3D)
     /// - Barometer (1D)
-    /// 
+    ///
     /// Current FIT-specification has no 2D sensors.
     pub fn sensor(
         &self,
@@ -432,15 +408,28 @@ impl Fit {
         SensorData::from_fit(&self, range, sensor_type)
     }
 
+    /// Returns `FileId` (`file_id/0`).
+    ///
+    /// Message required once for all devices.
+    /// Contains general device information,
+    /// such as device serial (`3/serial_number`),
+    /// and creation time (`4/time_created`).
+    pub fn file_id(
+        &self,
+        range: Option<&Range<usize>>
+    ) -> Result<FileId, FitError> {
+        FileId::from_fit(&self, range)
+    }
+
     /// VIRB only.
-    /// 
+    ///
     /// VIRB logs a relative timestamp counting from
     /// when the camera was turned on. All timestamps
     /// require augmentation by an offset value,
     /// `timestamp_correlation` (FIT global ID `162`),
     /// to become absolute date time stamps.
     /// This is logged at GPS satellite lock.
-    /// 
+    ///
     /// Other devices, such as watches, seem to directly
     /// log a UTC timestamp in seconds for all records.
     pub fn time(&self) -> Result<TimestampCorrelation, FitError> {
@@ -449,7 +438,7 @@ impl Fit {
 
     /// Returns a sub-set of `Record/20`. Which fields are
     /// present in `Record` is highly dependent on device.
-    /// 
+    ///
     /// Currently supported fields are present for VIRB cameras,
     /// but may not be for other devices:
     /// - `timestamp`, field definition number `253`
@@ -459,7 +448,7 @@ impl Fit {
     /// - `speed`, field definition number `73`
     /// - `altitude`, field definition number `78`
     /// - `gps_accuracy`, field definition number `31`
-    /// 
+    ///
     /// If `no_fail` is set to `true`, records with errors
     /// relating to missing fields will be silently discarded.
     pub fn record(
@@ -477,7 +466,7 @@ impl Fit {
             .par_iter()
             .map(|p| p.to_point())
             .collect();
-        
+
         if points.is_empty() {
             points = self.record(range, true)?
                 .par_iter()

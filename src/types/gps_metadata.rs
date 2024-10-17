@@ -1,5 +1,6 @@
 //! FIT `gps_metadata` message (global ID 160). Only VIRB logs all described fields.
-//! Other devices may return an error if `gps_metadata` exists.
+//! Other devices may return an error if `gps_metadata` exists,
+//! and may not include coordinates. Look in `20/record` instead if this is the case.
 
 use std::ops::Range;
 use time::Duration;

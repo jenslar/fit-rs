@@ -42,11 +42,6 @@ impl DataField {
         })
     }
 
-    // pub fn value<T>(&self) -> Option<Vec<T>> {
-    //     self.data.into()
-    //     // None
-    // }
-
     /// FIT field definition number.
     pub fn field_def_no(&self) -> u8 {
         self.definition.field_def_no
@@ -64,19 +59,19 @@ impl DataField {
         self.attributes.as_ref()
             .map(|attr| attr.name.as_str())
     }
-    
+
     /// Returns field scale if set.
     pub fn scale(&self) -> Option<u32> {
         self.attributes.as_ref()
             .and_then(|attr| attr.scale)
     }
-    
+
     /// Returns field offset if set.
     pub fn offset(&self) -> Option<i32> {
         self.attributes.as_ref()
             .and_then(|attr| attr.offset)
     }
-    
+
     /// Returns field units if set.
     pub fn units(&self) -> Option<&str> {
         self.attributes.as_ref()
@@ -89,21 +84,21 @@ impl DataField {
         self.attributes.as_mut()
             .map(|attr| attr.name = name.to_owned());
     }
-    
+
     /// Set field scale.
     pub fn set_scale(&mut self, scale: Option<u32>) {
         self.init_attr();
         self.attributes.as_mut()
             .map(|attr| attr.scale = scale);
     }
-    
+
     /// Set field offset.
     pub fn set_offset(&mut self, offset: Option<i32>) {
         self.init_attr();
         self.attributes.as_mut()
             .map(|attr| attr.offset = offset);
     }
-    
+
     /// Set field units.
     pub fn set_units(&mut self, units: Option<&str>) {
         self.init_attr();

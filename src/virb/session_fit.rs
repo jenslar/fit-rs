@@ -89,6 +89,8 @@ impl FitSession {
     /// Note that duration derived via FIT data may differ slightly
     /// from the media duration of corresponding VIRB MP4-file/s.
     pub fn timespan_rel(&self) -> Option<(Duration, Duration)> {
+        // println!("HELLO");
+        // dbg!(&self.fit.is_some());
         if let Some(fit) = &self.fit {
 
             // Find first camera_event/161 in session index range
