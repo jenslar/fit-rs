@@ -42,7 +42,6 @@ mod types;
 mod files;
 mod profile;
 mod constants;
-mod tests;
 
 pub use fit::{
     Fit,
