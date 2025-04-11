@@ -11,7 +11,7 @@ keywords = ["gopro", "gpmf", "action camera", "gps", "sensor"]
 [dependencies]
 binrw = "0.14"
 rayon = "1.10"
-nalgebra = "0.33"
-time = {version = "0.3.36", features = ["macros", "formatting"]}
+nalgebra = "0.33.2"
+time = {version = "0.3.41", features = ["macros", "formatting"]}
 walkdir = "2.5"
 mp4iter = {git = "https://github.com/jenslar/mp4iter.git"}
